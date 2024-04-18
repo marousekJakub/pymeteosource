@@ -1,6 +1,7 @@
 """Module that handles sending the requests to API"""
 
 import requests
+from requests.adapters import HTTPAdapter, Retry
 
 from .errors import InvalidRequestError
 
@@ -33,6 +34,11 @@ class RequestHandler:
         if use_gzip:
             self.session.headers.update({'Accept-Encoding': 'gzip'})
 
+        # retry a request in case of a timeout, socket error and 5xx errors
+        retries = Retry(total=3, backoff_factor=1, status_forcelist=[500, 501, 502, 503, 504])
+        self.session.mount("http://", HTTPAdapter(max_retries=retries))
+        self.session.mount("https://", HTTPAdapter(max_retries=retries))
+
     def execute_request(self, url, **params):
         """
         Make a request and return the JSON response
@@ -40,7 +46,7 @@ class RequestHandler:
         :param str: URL of the requests (without the parameters)
         :param kwargs: Arguments of the request (lat, lon, ...)
         """
-        response = self.session.get(url, params=params)
+        response = self.session.get(url, params=params, timeout=10)
         if response.status_code != 200:
             raise InvalidRequestError(response)
 
